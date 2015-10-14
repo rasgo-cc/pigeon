@@ -2,9 +2,9 @@
 
 ![](https://github.com/LineHealth/pigeon/blob/develop/diagram.png)
 
-## Example (Python)
+#### Example (Python)
 
-### Server
+##### Server
 ```python
 class Server(PigeonServer):
 
@@ -18,7 +18,7 @@ server = Server()
 server.connect("localhost", 1234)
 server.run(True)
 ```
-### Client
+##### Client
 ```python
 class Client(PigeonClient):
 
