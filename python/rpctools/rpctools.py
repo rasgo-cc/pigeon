@@ -157,7 +157,7 @@ class RPCServer(object):
 
     def __init__(self):
         self._rpc_thread = threading.Thread(target=self._run)
-        self._rpc_thread.daemon = True
+        self._rpc_thread.setDaemon(True)
         self._tcp_listener = threading.Thread(target=self._listener)
         self._tcp_listener.setDaemon(True)
         self._server = None
@@ -165,8 +165,11 @@ class RPCServer(object):
         self._request_to_quit = False
         self._clients = []
         self._lock = threading.Lock()
+        self._cond = threading.Condition()
+        self._waiting_for_cond = False
         self._queue = Queue.Queue()
         self.log = Logger()
+        self._reply_text = ""
         self.rpc_prefix = "rpc_"
 
     def _run(self):
@@ -176,20 +179,30 @@ class RPCServer(object):
             if "rpc" in rpc.keys():
                 self._handle_rpc(rpc)
 
+        self.disconnect()
+
     def run(self, cli=False):
+        self._rpc_thread.start()
         if cli:
-            self._rpc_thread.start()
             while True:
                 input_text = raw_input()
                 self.handle_rpc_serial_data(input_text)
                 if input_text == "quit":
                     break
-            self._rpc_thread.join()
-        else:
-            self._run()
+        self._rpc_thread.join()
 
     def rpc_quit(self):
         self._request_to_quit = True
+        self._queue.put({"dum": "my"})
+
+    def rpc_reply(self, text):
+        if self._waiting_for_cond is True:
+            self._cond.acquire()
+            self._reply_text = text
+            self._cond.notify()
+            self._cond.release()
+        else:
+            self.log.error("Not waiting for a reply (%s)" % text)
 
     def _handle_message(self, text):
         self.log.debug("Message: %s" % text)
@@ -204,6 +217,16 @@ class RPCServer(object):
             "params": params,
             }})
 
+    def ask(self, text, meta=""):
+        self._waiting_for_cond = True
+        self.message(text, meta=meta)
+        self._cond.acquire()
+        self._cond.wait()
+        self._cond.release()
+        self._waiting_for_cond = False
+        return self._reply_text
+
+
     def connect(self, hostname, port):
         self._alive = True
         self._server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -214,10 +237,7 @@ class RPCServer(object):
 
     def disconnect(self):
         self._alive = False
-        #self._thread_listener.join(10000)
         self.message("", meta="server.disconnected")
-        self._server.fileno()
-        #self._server.shutdown(socket.SHUT_RD)
         self._server.close()
 
     def _listener(self):
@@ -231,7 +251,6 @@ class RPCServer(object):
                     self._lock.release()
                     threading._start_new_thread(self._handle_client, (client_skt, client_addr))
         self._server.close()
-        print("Server closed")
 
     def use_prefix(self, prefix):
         self.rpc_prefix = prefix
@@ -251,33 +270,36 @@ class RPCServer(object):
             self.log.error("RPC not implemented: %s" % rpc_method)
             return
 
-        rpc_cb(**rpc_params)
+        def _call_callback():
+            rpc_cb(**rpc_params)
+
+        threading._start_new_thread(_call_callback, ())
 
 
     def handle_rpc_serial_data(self, data):
-            data = data.replace('\r', '')
-            data = data.replace('\n', '')
-            fields = data.split(' ')
-            if len(fields) < 1:
-                self.log.debug("Invalid DATA:", data)
-            else:
-                method = fields[0]
-                params = {}
-                for param in fields[1:]:
-                    param_fields = param.split("=")
-                    if len(param_fields) == 2:
-                        param_name = param_fields[0]
-                        param_value = param_fields[1]
-                        if param_value.isdigit():
-                            param_value = int(param_value)
-                        params.update({param_name: param_value})
-                rpc_pkt = {
-                    "rpc": {
-                        "method": method,
-                        "params": params,
-                    }
+        data = data.replace('\r', '')
+        data = data.replace('\n', '')
+        fields = data.split(' ')
+        if len(fields) < 1:
+            self.log.debug("Invalid DATA:", data)
+        else:
+            method = fields[0]
+            params = {}
+            for param in fields[1:]:
+                param_fields = param.split("=")
+                if len(param_fields) == 2:
+                    param_name = param_fields[0]
+                    param_value = param_fields[1]
+                    if param_value.isdigit():
+                        param_value = int(param_value)
+                    params.update({param_name: param_value})
+            rpc_pkt = {
+                "rpc": {
+                    "method": method,
+                    "params": params,
                 }
-                self._queue.put(rpc_pkt)
+            }
+            self._queue.put(rpc_pkt)
 
     def _handle_client(self, skt, addr):
         self.log.info("Client connected: %s %d" % (addr[0], skt.fileno()))
@@ -308,9 +330,8 @@ class RPCClient(object):
         self.log = Logger()
 
     def connect(self, hostname, port):
-        print "CONNECT CLIENT"
         self._alive = True
-        self._thread_listener = threading.Thread(target = self._listener)
+        self._thread_listener = threading.Thread(target=self._listener)
         self._thread_listener.setDaemon(True)
         self._skt = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._skt.connect((hostname, port))
@@ -323,15 +344,16 @@ class RPCClient(object):
         self._thread_listener.join(3000)
 
     def send_data(self, text):
-        self._skt.write(text + "\n\r")
+        self._skt.send(text + "\n\r")
 
     def handle_message(self, message):
+        self.log.debug("Message received: %s" % message)
         pass
 
     def _handle_json(self, json_str):
         json_data = json.loads(json_str)
         if "message" in json_data.keys():
-            self.handle_message(json_data)
+            self.handle_message(json_data["message"])
 
     def _listener(self):
         while self._alive:
