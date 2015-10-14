@@ -2,8 +2,10 @@
 
 ![](https://github.com/LineHealth/pigeon/blob/develop/diagram.png)
 
+## Example (Python)
 
-```
+### Server
+```python
 class Server(PigeonServer):
 
     def rpc_greeting(self, text):
@@ -16,8 +18,8 @@ server = Server()
 server.connect("localhost", 1234)
 server.run(True)
 ```
-
-```
+### Client
+```python
 class Client(PigeonClient):
 
     def handle_message(self, message):
