@@ -1,6 +1,6 @@
-from rpctools.rpctools import RPCClient
+from pigeon.client import PigeonClient
 
-class App(RPCClient):
+class App(PigeonClient):
 
     def handle_message(self, message):
         meta = message["meta"]
