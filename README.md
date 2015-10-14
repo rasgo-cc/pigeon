@@ -1,5 +1,3 @@
-![](https://github.com/LineHealth/rpctools/blob/develop/rpctools_logo.png)
+![](https://github.com/LineHealth/pigeon/blob/develop/banner.png)
 
-Dead-simple communication between applications
-
-![](https://github.com/LineHealth/rpctools/blob/develop/rpctools_diagram.png)
+![](https://github.com/LineHealth/pigeon/blob/develop/diagram.png)
