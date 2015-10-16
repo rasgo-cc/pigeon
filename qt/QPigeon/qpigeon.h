@@ -4,15 +4,60 @@
 #include <QObject>
 #include <QTcpSocket>
 #include <QTcpServer>
+#include <QJsonDocument>
 
-class QPigeonClient : public QObject
+
+class QPigeonDataParser : public QObject
+{
+    Q_OBJECT
+public:
+    explicit QPigeonDataParser(QObject *parent = 0);
+
+
+signals:
+    void parsed(QByteArray);
+
+public slots:
+    virtual void parseData(QByteArray data) = 0;
+};
+
+class QPigeonJsonParser : public QPigeonDataParser
+{
+    Q_OBJECT
+public:
+    explicit QPigeonJsonParser(QObject *parent = 0);
+
+signals:
+
+public slots:
+    void parseData(QByteArray data);
+
+private:
+    QString _jsonStr;
+    int _depthLevel;
+    bool _escChar;
+    bool _inString;
+
+};
+
+class QPigeonSerialParser : public QPigeonDataParser
+{
+    Q_OBJECT
+public:
+    explicit QPigeonSerialParser(QObject *parent = 0);
+
+signals:
+
+public slots:
+    void parseData(QByteArray data);
+};
+
+class QPigeonClient : public QTcpSocket
 {
     Q_OBJECT
 public:
     explicit QPigeonClient(QObject *parent = 0);
 
-    void connectToServer(const QString &address, int port);
-    void disconnectFromServer();
     void sendData(const QString &text);
 
 signals:
@@ -22,10 +67,10 @@ public slots:
 
 private slots:
     void _slotReadyRead();
-    void _handleJson(QJsonDocument doc);
+    void _handleJson(QByteArray jsonData);
 
 private:
-    QTcpSocket _skt;
+    QPigeonJsonParser *_jsonParser;
 };
 
 class QPigeonServer : public QObject
@@ -44,39 +89,6 @@ class QPigeonLogger : public QObject
     Q_OBJECT
 public:
     explicit QPigeonLogger(QObject *parent = 0);
-
-signals:
-
-public slots:
-};
-
-class QPigeonDataParser : public QObject
-{
-    Q_OBJECT
-public:
-    explicit QPigeonDataParser(QObject *parent = 0);
-
-signals:
-
-public slots:
-};
-
-class QPigeonJsonParser : public QObject
-{
-    Q_OBJECT
-public:
-    explicit QPigeonJsonParser(QObject *parent = 0);
-
-signals:
-
-public slots:
-};
-
-class QPigeonSerialParser : public QObject
-{
-    Q_OBJECT
-public:
-    explicit QPigeonSerialParser(QObject *parent = 0);
 
 signals:
 
