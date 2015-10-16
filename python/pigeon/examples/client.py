@@ -1,13 +1,13 @@
 from pigeon.client import PigeonClient
 
-class App(PigeonClient):
+class Client(PigeonClient):
 
     def handle_message(self, message):
         meta = message["meta"]
         text = message["text"]
         print("%20s | %s" % (meta, text))
 
-app = App()
+app = Client()
 app.connect("localhost", 1234)
 
 print("Type your name: ")
