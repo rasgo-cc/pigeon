@@ -12,6 +12,9 @@ class DataParser(object):
     def clear(self):
         self.parsed_str = ""
 
+    def handle_parsed_data(self, data):
+        pass
+
 
 class SerialParser(DataParser):
     def __init__(self):
@@ -20,6 +23,7 @@ class SerialParser(DataParser):
     def parse_data(self, data):
         for ch in data:
             if ch == '\n':
+                self.handle_parsed_data(self.parsed_str)
                 if self._callback["parsed"] is not None:
                     self._callback["parsed"](self.parsed_str)
                     self.parsed_str = ""
@@ -61,5 +65,6 @@ class JsonParser(DataParser):
 
             self.parsed_str += ch
 
+            self.handle_parsed_data(self.parsed_str)
             if done and self._callback["parsed"] is not None:
                 self._callback["parsed"](self.parsed_str)

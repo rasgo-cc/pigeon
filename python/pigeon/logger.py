@@ -1,5 +1,6 @@
 
 import time
+import threading
 
 class Logger():
     NONE = 0
@@ -12,6 +13,8 @@ class Logger():
     default_levels = ALL
 
     _logs = []
+    _lock = threading.Lock()
+    _use_lock = True
 
     def __init__(self):
         self._levels = Logger.default_levels  # all by default
@@ -21,6 +24,10 @@ class Logger():
 
     def __del__(self):
         Logger._logs.remove(self)
+
+    @staticmethod
+    def global_use_lock(use):
+        Logger._use_lock = use
 
     @staticmethod
     def global_set_levels(levels):
@@ -75,9 +82,15 @@ class Logger():
 
         text = "%s %s %s" % (timestamp, type_str, message)
 
+        if Logger._use_lock:
+            Logger._lock.acquire()
+
         if self._custom_logger is not None:
             if self._verbose:
                 print(text)
             self._custom_logger(text)
         else:
             print(text)
+
+        if Logger._use_lock:
+            Logger._lock.release()
