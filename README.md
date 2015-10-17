@@ -32,7 +32,7 @@ python setup.py install
 ```python
 class Server(PigeonServer):
 
-    def rpc_greeting(self, text):
+    def pgn_greeting(self, text):
         self.message("Hello %s!" % text, meta="hello")
         while self.ask("Do you want me to say it again?", meta="question") == "yes":
             self.message("Hello again %s!" % text, meta="hello_again")
