@@ -7,6 +7,75 @@ import json
 from logger import Logger
 from parser import SerialParser
 
+class TCPServer(object):
+
+    def __init__(self):
+        self.log = Logger()
+        self._listener_thread = threading.Thread(target=self._listener)
+        self._listener_thread.setDaemon(True)
+        self._alive = False
+        self._lock = threading.Lock()
+        self._clients = []
+        self._server = None
+
+    def bind(self, hostname, port):
+        self._alive = True
+        self._server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._server.bind((hostname, port))
+        self._server.listen(1)
+        self._tcp_listener.start()
+        self.log.info("Server %s listening on %s %d" % (self.__class__.__name__, hostname, port))
+
+    def close(self):
+        self._alive = False
+        self._server.close()
+        self._listener_thread.join()
+        self.log.info("Server %s closed" % self.__class__.__name__)
+
+    def _handle_client(self, skt, addr):
+        self.log.info("Client connected: %s %d" % (addr[0], skt.fileno()))
+        self.handle_client(skt, addr)
+        self.log.info("Client disconnected: %s %d" % (addr[0], skt.fileno()))
+        self._lock.acquire()
+        self._clients.remove(skt)
+        self._lock.release()
+        skt.close()
+
+    def send_to_all(self, data):
+        self._lock.acquire()
+        clients = list(self._clients)
+        self._lock.release()
+        for client in clients:
+            try:
+                client.send(data)
+            except:
+                self.log.error("Failed to send data to client %s" % client)
+
+
+    def handle_client(self, skt, addr):
+        while 1:
+            try:
+                data = skt.recv(1024)
+                if not data:
+                    break
+            except Exception, e:
+                self.log.error(str(e))
+                break
+
+    def _listener(self):
+        while self._alive:
+            rd, wr, err = select.select([self._server], [], [])
+            for s in rd:
+                if s is self._server:
+                    client_skt, client_addr = self._server.accept()
+                    self._lock.acquire()
+                    self._clients.append(client_skt)
+                    self._lock.release()
+                    threading._start_new_thread(self.handle_client, (client_skt, client_addr))
+
+        self._server.close()
+
+
 class PigeonServer(object):
 
     def __init__(self):
@@ -103,7 +172,7 @@ class PigeonServer(object):
                     self._lock.acquire()
                     self._clients.append(client_skt)
                     self._lock.release()
-                    threading._start_new_thread(self._handle_client, (client_skt, client_addr))
+                    threading._start_new_thread(self.handle_client, (client_skt, client_addr))
         self._server.close()
 
     def use_prefix(self, prefix):
@@ -155,7 +224,7 @@ class PigeonServer(object):
             }
             self._queue.put(pgn_pkt)
 
-    def _handle_client(self, skt, addr):
+    def handle_client(self, skt, addr):
         self.log.info("Client connected: %s %d" % (addr[0], skt.fileno()))
 
         data_parser = SerialParser()
