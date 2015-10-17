@@ -38,7 +38,7 @@ class Server(PigeonServer):
             self.message("Hello again %s!" % text, meta="hello_again")
 
 server = Server()
-server.connect("localhost", 1234)
+server.bind("localhost", 1234)
 server.run(True)
 ```
 ##### Client
